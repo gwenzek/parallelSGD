@@ -1,5 +1,5 @@
 from multiprocessing import Process
-from globalVar import globalMatrix, printMatrix
+#from globalVar import globalMatrix, printMatrix
 from time import time, sleep
 
 
@@ -52,7 +52,7 @@ class WorkingThread(Process):
 
         for _ in range(min(self.queueSize, len(self.queue))):
             (i, j) = self.queue.pop(0)
-            self.globalMatrix[i][j] = self.index + 1
+            self.globalMatrix[9 * i + j] = self.index + 1
         print self.globalMatrix
 
     def pushToQueue(self, i, j):
