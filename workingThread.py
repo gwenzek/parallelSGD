@@ -1,18 +1,33 @@
 from multiprocessing import Process
-#from globalVar import globalMatrix, printMatrix
-from time import time, sleep
+from time import sleep
+
+
+def printMatrix(matrix, nRows, nCols):
+    print "-------"
+    for i in range(nRows):
+        print "[",
+        for j in range(nCols):
+            print matrix[nRows * i + j],
+        print "]"
 
 
 class WorkingThread(Process):
 
-    def __init__(self, event, boolArray, index, nThread,
-                 queueSize, maxIter, globalMatrix):
+    def __init__(self,
+                 event, boolArray, index, nThread,
+                 dim, sharedBuffer, bufferSize,
+                 maxIter, globalMatrix):
         Process.__init__(self)
         self.event = event
         self.boolArray = boolArray
         self.index = index
-        self.queue = []
-        self.queueSize = queueSize
+
+        self.buffer = sharedBuffer
+        self.bufferRead = 0
+        self.bufferSize = bufferSize
+
+        self.nRows, self.nCols = dim
+
         self.maxIter = maxIter
         self.nIter = 0
         self.nThread = nThread
@@ -20,21 +35,25 @@ class WorkingThread(Process):
 
     def run(self):
         print "Starting Thread %d " % self.index
+
         while self.hasNext():
             self.treatOneRound()
             if self.checkArray():
                 print "Thread %d finished last" % self.index
-                print self.globalMatrix
+                printMatrix(self.globalMatrix, self.nRows, self.nCols)
                 self.event.set()
                 self.event.clear()
+
             else:
-                # print "Thread %d waiting..." % self.index
+                print "Thread %d waiting..." % self.index
                 self.event.wait()
-            # print "Thread %d resuming" % self.index
+
+            print "Thread %d resuming, %d" \
+                % (self.index, self.bufferRead)
             self.nIter += 1
-        sleep(5)
+
+        sleep(1)
         print "Exiting Thread %d " % self.index
-        print self.globalMatrix
 
     def checkArray(self):
         self.boolArray[self.index] = True
@@ -47,16 +66,35 @@ class WorkingThread(Process):
         return True
 
     def treatOneRound(self):
-        print "%f Thread %d |round %d | queue %d" \
-            % (time(), self.index, self.nIter, len(self.queue))
+        print "Thread %d | Round %d | queue %d" \
+            % (self.index, self.nIter, self.peek())
 
-        for _ in range(min(self.queueSize, len(self.queue))):
-            (i, j) = self.queue.pop(0)
-            self.globalMatrix[9 * i + j] = self.index + 1
-        print self.globalMatrix
+        n = self.read()
+        for _ in range(n):
+            i = self.read()
+            j = self.read()
+            self.globalMatrix[self.nRows * i + j] = self.index + 1
+            #print "Thread %d : (%d, %d)" % (self.index, i, j)
 
-    def pushToQueue(self, i, j):
-        self.queue.append((i, j))
+        printMatrix(self.globalMatrix, self.nRows, self.nCols)
+
+    def read(self):
+        n = self.buffer[self.bufferRead]
+        self.bufferRead = (self.bufferRead + 1) % self.bufferSize
+        #print "reading from the buffer %d : read %d at %d" \
+        #    % (self.index, n, (self.bufferRead - 1))
+        return n
+
+    def peek(self):
+        return self.buffer[self.bufferRead]
+
+    def printQueue(self):
+        oldRead = self.bufferRead
+        n = self.read()
+        for _ in range(n):
+            print "(%d, %d)" % (self.read(), self.read()),
+        print "*"
+        self.bufferRead = oldRead
 
     def hasNext(self):
         return self.nIter < self.maxIter
