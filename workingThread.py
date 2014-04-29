@@ -1,15 +1,15 @@
-from multiprocessing import Process, Value, Array
+from multiprocessing import Process, Queue
 
 
-class WorkingThread (Process):
+class WorkingThread(Process):
 
     def __init__(self, event, boolArray, index,
-                 matrix, queue, maxIter):
+                 matrix, queueSize, maxIter):
         Process.__init__(self)
         self.event = event.Value
         self.boolArray = boolArray
         self.index = index
-        self.queue = queue
+        self.queue = Queue(queueSize)
         self.maxIter = maxIter
         self.nIter = 0
         self.matrix = matrix.Value
