@@ -1,5 +1,7 @@
 from multiprocessing import Process
 from random import randint
+from topThread import globalMatrix
+# workingThreads import WorkingThreads
 
 
 class PermThread (Process):
@@ -7,7 +9,7 @@ class PermThread (Process):
     def __init__(self, event, boolArray, index, workingThreads,
                  nRows, nCols, maxIter):
         Process.__init__(self)
-        self.event = event.Value
+        self.event = event
         self.workingThreads = workingThreads
         self.nRows = nRows
         self.nCols = nCols
@@ -20,12 +22,16 @@ class PermThread (Process):
     def run(self):
         print "Starting permThread"
         while self.hasNext():
+            print "permThread on round : %d" % self.nIter
             self.createOneShuffle()
 
             if self.checkArray():
+                print "Perm finished last"
+                print globalMatrix
                 self.event.set()
                 self.event.clear()
             else:
+                print "Perm waiting..."
                 self.event.wait()
             self.nIter += 1
         print "Exiting permThread"
@@ -50,10 +56,10 @@ class PermThread (Process):
                           (n + 1) * self.nRows / self.nThread):
                 for j in range(n * self.nCols / self.nThread,
                               (n + 1) * self.nCols / self.nThread):
-                    self.workingThreads[n].queue.add((permRow[i], permCol[j]))
+                    self.workingThreads[n].pushToQueue(permRow[i], permCol[j])
 
     def hasNext(self):
-        return self.nIter >= self.maxIter
+        return self.nIter < self.maxIter
 
 
 def createPerm(N):

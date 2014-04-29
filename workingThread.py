@@ -1,28 +1,34 @@
-from multiprocessing import Process, Queue
+from multiprocessing import Process
+from topThread import globalMatrix
 
 
 class WorkingThread(Process):
 
-    def __init__(self, event, boolArray, index,
-                 matrix, queueSize, maxIter):
+    def __init__(self, event, boolArray, index, nThread,
+                 queueSize, maxIter):
         Process.__init__(self)
-        self.event = event.Value
+        self.event = event
         self.boolArray = boolArray
         self.index = index
-        self.queue = Queue(queueSize)
+        self.queue = []
+        self.queueSize = queueSize
         self.maxIter = maxIter
         self.nIter = 0
-        self.matrix = matrix.Value
+        self.nThread = nThread
 
     def run(self):
-        print "Starting permThread"
+        print "Starting Thread %d " % self.index
         while self.hasNext():
             self.treatOneRound()
             if self.checkArray():
+                print "Thread %d finished last" % self.index
+                print globalMatrix
                 self.event.set()
                 self.event.clear()
             else:
+                print "Thread %d waiting..." % self.index
                 self.event.wait()
+            print "Thread %d resuming" % self.index
             self.nIter += 1
         print "Exiting permThread"
 
@@ -34,11 +40,17 @@ class WorkingThread(Process):
         """Every one finished"""
         for i in range(1 + self.nThread):
             self.boolArray[i] = False
-        print "Thread %d finished last" % self.index
         return True
 
     def treatOneRound(self):
-        print "updating gradient"
+        print "Thread %d : updating gradient, round %d" \
+            % (self.index, self.nIter)
+        for _ in range(max(self.queueSize)):
+            (i, j) = self.queue.pop(0)
+            globalMatrix[i, j] = self.index
+
+    def pushToQueue(self, i, j):
+        self.queue.append((i, j))
 
     def hasNext(self):
-        return not self.queue.isEmpty()
+        return self.nIter < self.maxIter
