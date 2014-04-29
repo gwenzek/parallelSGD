@@ -1,7 +1,7 @@
 from multiprocessing import Process, Value, Array
 
 
-class permThread (Process):
+class WorkingThread (Process):
 
     def __init__(self, event, boolArray, index,
                  matrix, queue, maxIter):
@@ -21,6 +21,8 @@ class permThread (Process):
             if self.checkArray():
                 self.event.set()
                 self.event.clear()
+            else:
+                self.event.wait()
             self.nIter += 1
         print "Exiting permThread"
 
