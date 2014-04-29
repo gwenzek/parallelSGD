@@ -17,7 +17,7 @@ class permThread (Process):
     def run(self):
         print "Starting permThread"
         while self.hasNext():
-            self.treatOneRoundShuffle()
+            self.treatOneRound()
             if self.checkArray():
                 self.event.set()
                 self.event.clear()
@@ -32,10 +32,10 @@ class permThread (Process):
         """Every one finished"""
         for i in range(1 + self.nThread):
             self.boolArray[i] = False
-        print "!!! Perm is the last to finish !!!"
+        print "Thread %d finished last" % self.index
         return True
 
-    def treatOneRoundShuffle(self):
+    def treatOneRound(self):
         print "updating gradient"
 
     def hasNext(self):
