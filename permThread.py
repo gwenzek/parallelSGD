@@ -1,6 +1,7 @@
 from multiprocessing import Process
 from random import randint
-from topThread import globalMatrix
+from globalVar import globalMatrix
+#from topThread import globalMatrix
 # workingThreads import WorkingThreads
 
 

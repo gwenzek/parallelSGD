@@ -1,11 +1,12 @@
 from multiprocessing import Process
-from topThread import globalMatrix
+from globalVar import globalMatrix, printMatrix
+from time import time, sleep
 
 
 class WorkingThread(Process):
 
     def __init__(self, event, boolArray, index, nThread,
-                 queueSize, maxIter):
+                 queueSize, maxIter, globalMatrix):
         Process.__init__(self)
         self.event = event
         self.boolArray = boolArray
@@ -15,6 +16,7 @@ class WorkingThread(Process):
         self.maxIter = maxIter
         self.nIter = 0
         self.nThread = nThread
+        self.globalMatrix = globalMatrix
 
     def run(self):
         print "Starting Thread %d " % self.index
@@ -22,15 +24,17 @@ class WorkingThread(Process):
             self.treatOneRound()
             if self.checkArray():
                 print "Thread %d finished last" % self.index
-                print globalMatrix
+                print self.globalMatrix
                 self.event.set()
                 self.event.clear()
             else:
-                print "Thread %d waiting..." % self.index
+                # print "Thread %d waiting..." % self.index
                 self.event.wait()
-            print "Thread %d resuming" % self.index
+            # print "Thread %d resuming" % self.index
             self.nIter += 1
-        print "Exiting permThread"
+        sleep(5)
+        print "Exiting Thread %d " % self.index
+        print self.globalMatrix
 
     def checkArray(self):
         self.boolArray[self.index] = True
@@ -43,11 +47,13 @@ class WorkingThread(Process):
         return True
 
     def treatOneRound(self):
-        print "Thread %d : updating gradient, round %d" \
-            % (self.index, self.nIter)
-        for _ in range(max(self.queueSize)):
+        print "%f Thread %d |round %d | queue %d" \
+            % (time(), self.index, self.nIter, len(self.queue))
+
+        for _ in range(min(self.queueSize, len(self.queue))):
             (i, j) = self.queue.pop(0)
-            globalMatrix[i, j] = self.index
+            self.globalMatrix[i][j] = self.index + 1
+        print self.globalMatrix
 
     def pushToQueue(self, i, j):
         self.queue.append((i, j))
