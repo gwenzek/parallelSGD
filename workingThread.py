@@ -14,12 +14,15 @@ def printMatrix(matrix, nRows, nCols):
 class WorkingThread(Process):
 
     def __init__(self,
-                 event, boolArray, index, nThread,
-                 dim, sharedBuffer, bufferSize,
+                 event, counter, lock,
+                 index, nThread, dim,
+                 sharedBuffer, bufferSize,
                  maxIter, globalMatrix):
         Process.__init__(self)
         self.event = event
-        self.boolArray = boolArray
+        self.counter = counter
+        self.lock = lock
+        #self.boolArray = boolArray
         self.index = index
 
         self.buffer = sharedBuffer
@@ -40,8 +43,9 @@ class WorkingThread(Process):
             self.treatOneRound()
             if self.checkArray():
                 print "Thread %d finished last" % self.index
-                printMatrix(self.globalMatrix, self.nRows, self.nCols)
+                #printMatrix(self.globalMatrix, self.nRows, self.nCols)
                 self.event.set()
+                sleep(2)
                 self.event.clear()
 
             else:
@@ -49,24 +53,32 @@ class WorkingThread(Process):
                 self.event.wait()
 
             print "Thread %d resuming, %d" \
-                % (self.index, self.bufferRead)
+                % (self.index, self.peek())
             self.nIter += 1
 
-        sleep(1)
         print "Exiting Thread %d " % self.index
 
     def checkArray(self):
-        self.boolArray[self.index] = True
-        for b in self.boolArray:
-            if not b:
-                return False
-        """Every one finished"""
-        for i in range(1 + self.nThread):
-            self.boolArray[i] = False
-        return True
+        self.lock.acquire()
+        self.counter.value += 1
+        if self.counter.value > self.nThread:
+            self.counter.value = 0
+            self.lock.release()
+            return True
+        else:
+            self.lock.release()
+            return False
+        # self.boolArray[self.index] = True
+        # for b in self.boolArray:
+        #     if not b:
+        #         return False
+        # """Every one finished"""
+        # for i in range(1 + self.nThread):
+        #     self.boolArray[i] = False
+        # return True
 
     def treatOneRound(self):
-        print "Thread %d | Round %d | queue %d" \
+        print "Thread %d | Iter %d | queue %d" \
             % (self.index, self.nIter, self.peek())
 
         n = self.read()
@@ -76,7 +88,8 @@ class WorkingThread(Process):
             self.globalMatrix[self.nRows * i + j] = self.index + 1
             #print "Thread %d : (%d, %d)" % (self.index, i, j)
 
-        printMatrix(self.globalMatrix, self.nRows, self.nCols)
+        sleep(1)
+        #printMatrix(self.globalMatrix, self.nRows, self.nCols)
 
     def read(self):
         n = self.buffer[self.bufferRead]

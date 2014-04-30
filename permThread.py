@@ -7,8 +7,10 @@ from random import randint
 
 class PermThread (Process):
 
-    def __init__(self, event, boolArray, index,
-                 workingThreads, buffers, bufferSize,
+    def __init__(self,
+                 event, counter, lock,
+                 index, workingThreads,
+                 buffers, bufferSize,
                  nRows, nCols, maxIter):
         Process.__init__(self)
         self.event = event
@@ -16,7 +18,10 @@ class PermThread (Process):
         self.nRows = nRows
         self.nCols = nCols
         self.nThread = len(workingThreads)
-        self.boolArray = boolArray
+
+        self.counter = counter
+        self.lock = lock
+
         self.index = index
         self.maxIter = maxIter
         self.nIter = 0
@@ -28,7 +33,7 @@ class PermThread (Process):
     def run(self):
         print "Starting permThread"
         while self.hasNext():
-            print "permThread on round : %d" % self.nIter
+            print "permThread on iter : %d" % self.nIter
             self.createOneShuffle()
 
             if self.checkArray():
@@ -42,15 +47,23 @@ class PermThread (Process):
         print "Exiting permThread"
 
     def checkArray(self):
-        self.boolArray[self.index] = True
-        for b in self.boolArray:
-            if not b:
-                return False
-        """Every one finished"""
-        for i in range(1 + self.nThread):
-            self.boolArray[i] = False
-        print "!!! Perm is the last to finish !!!"
-        return True
+        self.lock.acquire()
+        self.counter.value += 1
+        if self.counter.value > self.nThread:
+            self.counter.value = 0
+            self.lock.release()
+            return True
+        else:
+            self.lock.release()
+        # self.boolArray[self.index] = True
+        # for b in self.boolArray:
+        #     if not b:
+        #         return False
+        # """Every one finished"""
+        # for i in range(1 + self.nThread):
+        #     self.boolArray[i] = False
+        # print "!!! Perm is the last to finish !!!"
+        # return True
 
     def createOneShuffle(self):
         print "shuffling, round %d" % self.round
@@ -72,7 +85,7 @@ class PermThread (Process):
         self.round = (self.round + 1) % self.nThread
 
     def hasNext(self):
-        return self.nIter < self.maxIter
+        return self.nIter <= self.maxIter
 
     def write(self, buff, n):
         self.buffers[buff][self.bufferWrite[buff]] = n
