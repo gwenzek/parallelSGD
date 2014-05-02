@@ -16,9 +16,9 @@ def preprocess(dataFile, infoFile):
         omegaUsers[i] += 1
         omegaMovies[j] += 1
         om.append((i,j))
-        avg+=note/5.0
+        avg += note/5.0
 
-    return(nUsers, nMovies, omegaUsers, omegaMovies, M,om,avg/len(om))
+    return(nUsers, nMovies, omegaUsers, omegaMovies, M, om, avg/len(om), )
 
 
 def preprocessDir(directory):
