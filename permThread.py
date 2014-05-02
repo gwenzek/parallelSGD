@@ -1,4 +1,4 @@
-from multiprocessing import Process, Event
+from multiprocessing import Process,Event
 from random import randint
 
 #from topThread import globalMatrix
@@ -8,48 +8,51 @@ from random import randint
 class PermThread (Process):
 
     def __init__(self,
-                 eventWT, eventFEnew, eventFEold, roundCounter,
-                 counter, counterFE, lockFE,
-                 index, WThreads,
+                 eventFEnew,eventFEold,
+                 counterFE, lockFE,
+                 nWThreads,
                  buffers, bufferSize,
-                 nRows, nCols, nbEpochs, om
+                 nRows, nCols, nbEpochs,om
                  ):
-
+        
         Process.__init__(self)
+        
+        # Concurrency tools
         self.counterFE = counterFE
         self.eventFEnew = eventFEnew
         self.eventFEold = eventFEold
-        self.event = Event()
-        self.WThreads = WThreads
-        self.nRows = nRows
-        self.nCols = nCols
-        self.nWThread = len(WThreads)
-        self.om = om
-        self.counter = counter
         self.lockFE = lockFE
-        self.nbEpochs = nbEpochs
-        self.nIter = 0
+
+        # I/O with working threads
         self.buffers = buffers
         self.bufferSize = bufferSize
-        self.bufferWrite = [0 for _ in range(self.nThread)]
+        self.bufferWrite = [0 for _ in range(nWThreads)]
+        
+        # Problem-specific data        
+        self.nRows = nRows
+        self.nCols = nCols
+        self.nWThread = nWThreads
+        self.om = om
+        self.nbEpochs = nbEpochs
+
 
     def run(self):
         print "Starting permThread"
-
-        for i in range(1, self.nbEpochs):
-            print "permThread on epoch : %d" % i
+        
+        for i in range(1,self.nbEpochs):
+            print "permThread on epoch : %d" % i 
             self.createOneShuffle()
-            if self.checkArray(self.lockFE, self.counterFE, self.eventFEold, self.nWThread + 1):
+            if self.checkArray(self.lockFE,self.counterFE,self.eventFEold,self.nWThread+1):
                 print "Perm finished last"
                 self.eventFEnew.set()
             else:
                 print "Perm waiting..."
                 self.eventFEnew.wait()
-            self.eventFEnew, self.eventFEold = self.eventFEold, self.eventFEnew
+            self.eventFEnew,self.eventFEold=self.eventFEold,self.eventFEnew
         print "Exiting permThread"
         self.eventFEnew.set()
 
-    def checkArray(self, lock, counter, event, value):
+    def checkArray(self,lock,counter,event,value):
         lock.acquire()
         counter.value += 1
         if counter.value == value:
@@ -60,7 +63,7 @@ class PermThread (Process):
         else:
             lock.release()
             return False
-
+            
         # self.boolArray[self.index] = True
         # for b in self.boolArray:
         #     if not b:
@@ -72,16 +75,16 @@ class PermThread (Process):
         # return True
 
     def createOneShuffle(self):
-        print "shuffling, round %d" % self.round
+        # print "shuffling, round %d" % self.round
 
         permRow = createPerm(self.nRows)
         permCol = createPerm(self.nCols)
         C = [[[] for _ in range(self.nWThread)] for _ in range(self.nWThread)]
-
-        for (i, j) in self.om:
-            a = self.nWThread * permRow[i] / self.nRows
-            b = self.nwThread * permCol[i] / self.nCols
-            C[a][b].append((i, j))
+        
+        for (i,j) in self.om:
+            a = self.nWThread*permRow[i]/self.nRows
+            b = self.nWThread*permCol[i]/self.nCols
+            C[a][b].append((i,j))
 
         for u in range(self.nWThread):
             for a in range(self.nWThread):
@@ -91,7 +94,7 @@ class PermThread (Process):
     def write(self, buff, n):
         self.buffers[buff][self.bufferWrite[buff]] = n
         self.bufferWrite[buff] = (self.bufferWrite[buff] + 1) % self.bufferSize
-        # print "writing in the buffer %d : wrote %d at %d" \
+        #print "writing in the buffer %d : wrote %d at %d" \
         #   % (buff, n, self.bufferWrite[buff])
 
     def pushToQueue(self, buff, l):

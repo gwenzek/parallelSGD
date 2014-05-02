@@ -7,15 +7,18 @@ def preprocess(dataFile, infoFile):
     omegaUsers = [0 for _ in range(nUsers)]
     omegaMovies = [0 for _ in range(nMovies)]
     M = dict()
-
+    om=[]
+    avg = 0.0
     for line in open(dataFile, 'r'):
         l = line.split()
-        (i, j, note) = (int(l[0]) - 1, int(l[1]) - 1, float(l[2]) / 5)
-        M[(i, j)] = note
+        (i, j, note) = (int(l[0]) - 1, int(l[1]) - 1, int(l[2]))
+        M[(i, j)] = note/5.0
         omegaUsers[i] += 1
         omegaMovies[j] += 1
+        om.append((i,j))
+        avg+=note/5.0
 
-    return(nUsers, nMovies, omegaUsers, omegaMovies, M)
+    return(nUsers, nMovies, omegaUsers, omegaMovies, M,om,avg/len(om))
 
 
 def preprocessDir(directory):

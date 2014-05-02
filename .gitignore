@@ -1,6 +1,6 @@
 #data
 *.zip
-ml-100k/
+ml-*/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
