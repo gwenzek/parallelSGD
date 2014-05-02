@@ -10,7 +10,7 @@ def preprocess(dataFile, infoFile):
 
     for line in open(dataFile, 'r'):
         l = line.split()
-        (i, j, note) = (int(l[0]) - 1, int(l[1]) - 1, int(l[2]))
+        (i, j, note) = (int(l[0]) - 1, int(l[1]) - 1, float(l[2]) / 5)
         M[(i, j)] = note
         omegaUsers[i] += 1
         omegaMovies[j] += 1
