@@ -1,9 +1,9 @@
 from multiprocessing import Process,Event
-from random import randint
+from time import time
 
 #from topThread import globalMatrix
 # workingThreads import WorkingThreads
-
+import numpy
 
 class PermThread (Process):
 
@@ -38,8 +38,10 @@ class PermThread (Process):
 
     def run(self):
         print "Starting permThread"
-        
+        t = 0
         for i in range(1,self.nbEpochs):
+            print "Previous epoch : %f" %(time()-t)
+            t = time()
             print "permThread on epoch : %d" % i 
             self.createOneShuffle()
             if self.checkArray(self.lockFE,self.counterFE,self.eventFEold,self.nWThread+1):
@@ -79,17 +81,21 @@ class PermThread (Process):
 
         permRow = createPerm(self.nRows)
         permCol = createPerm(self.nCols)
-        C = [[[] for _ in range(self.nWThread)] for _ in range(self.nWThread)]
+        self.C = [[[] for _ in range(self.nWThread)] for _ in range(self.nWThread)]
         
         for (i,j) in self.om:
             a = self.nWThread*permRow[i]/self.nRows
-            b = self.nWThread*permCol[i]/self.nCols
-            C[a][b].append((i,j))
+            b = self.nWThread*permCol[j]/self.nCols
+            self.C[a][b].append(i)
+            self.C[a][b].append(j)
+        
+        print "Perm : Creation of C finished"
 
         for u in range(self.nWThread):
             for a in range(self.nWThread):
                 b = (a + u) % self.nWThread
-                self.pushToQueue(a, C[a][b])
+                self.pushToQueue(a, self.C[a][b])
+            print "Perm : Creation of round %d finished" %u
 
     def write(self, buff, n):
         self.buffers[buff][self.bufferWrite[buff]] = n
@@ -105,10 +111,7 @@ class PermThread (Process):
 
 
 def createPerm(N):
-    perm = [-1 for _ in range(N)]
-    for i in range(N):
-        j = randint(0, N - 1 - i)
-        while perm[j] >= 0:
-            j += 1
-        perm[j] = i
+    perm = [i for i in range(N)]
+    numpy.random.shuffle(perm)
     return perm
+
