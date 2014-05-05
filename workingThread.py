@@ -1,4 +1,5 @@
 from multiprocessing import Process
+import numpy
 
 
 def printMatrix(matrix, nRows, nCols):
@@ -58,11 +59,13 @@ class WorkingThread(Process):
         #print "Starting Thread %d " % self.index
 
         for _ in range(self.nbEpochs):
-            for _ in range(self.nWThread):
+            for roun in range(self.nWThread):
                 self.treatOneRound()
                 if self.checkArray(self.lockFR,self.counterFR,self.eventFRold,self.nWThread):
                     #print "Thread %d finished last" % self.index
+                    print "ROUND " + str(roun+1)
                     self.eventFRnew.set()
+                    
 
                 else:
                     #print "Thread %d waiting..." % self.index
@@ -109,43 +112,109 @@ class WorkingThread(Process):
         # return True
 
     def treatOneRound(self):
-
+        
+        
         n = self.read()
+
+        #print "index : " +str(self.index) + " couples a traiter : "+ str(n)
         for u in range(n):
+            # print u
             i = self.read()
             j = self.read()
+            self.nL = numpy.array(self.L[i*self.r:(i+1)*self.r])
+            self.nR = numpy.array(self.R[j*self.r:(j+1)*self.r])
             if self.method == "NUCLEAR_NORM":
                     fp = self.fprime((i,j),self.multiply(i,j,False))
-                    
-                    for ind in range(self.r):
-                        newL = (1-self.mu*self.alpha/self.om_i[i])*self.L[i*self.r+ind]-\
-                        self.alpha*fp*self.R[j*self.r+ind]
-                        newR = (1-self.mu*self.alpha/self.om_j[j])*self.R[j*self.r+ind]-\
-                        self.alpha*fp*self.L[i*self.r+ind]
-                        if(newL>10**20 or newR>10**20):
-                            print self.multiply(i,j,True)
-                            assert(True==False)
-                        if(str(newL)=="nan" or str(newR) == "nan" or str(newL)=="inf" or str(newR) == "inf" or str(newL)=="-inf" or str(newR) == "-inf"):
-                            print self.index
-                            print self.multiply(i,j,True)
-                            assert(True==False)
-                        self.L[i*self.r+ind] = newL
-                        self.R[j*self.r+ind] = newR
+                    self.nL = (1-self.mu*self.alpha/self.om_i[i])*self.nL-\
+                        self.alpha*fp*self.nR
+                    self.nR = (1-self.mu*self.alpha/self.om_j[j])*self.nR-\
+                      self.alpha*fp*self.nL
+                    self.L[i*self.r:(i+1)*self.r] = self.nL
+                    self.R[j*self.r:(j+1)*self.r] = self.nR
+                      
+#                    for ind in range(self.r):
+#                        newL = (1-self.mu*self.alpha/self.om_i[i])*self.L[i*self.r+ind]-\
+#                        self.alpha*fp*self.R[j*self.r+ind]
+#                        newR = (1-self.mu*self.alpha/self.om_j[j])*self.R[j*self.r+ind]-\
+#                        self.alpha*fp*self.L[i*self.r+ind]
+#                        if(newL>10**20 or newR>10**20):
+#                            print self.multiply(i,j,True)
+#                            assert(True==False)
+#                        if(str(newL)=="nan" or str(newR) == "nan" or str(newL)=="inf" or str(newR) == "inf" or str(newL)=="-inf" or str(newR) == "-inf"):
+#                            print self.index
+#                            print self.multiply(i,j,True)
+#                            assert(True==False)
+#                        self.L[i*self.r+ind] = newL
+#                        self.R[j*self.r+ind] = newR
+            #print "Thread %d : (%d, %d)" % (self.index, i, j)
+            
+        #printMatrix(self.globalMatrix, self.nRows, self.nCols)
+        
+    def multiply(self,i,j,printing):
+        return numpy.dot(self.nL,self.nR)
+#        res = 0.0
+#        for ind in range(self.r):
+#            if printing:
+#                print "ind : "+str(ind) + " L : " + str(self.L[i*self.r+ind])
+#                print "ind : "+str(ind) + " R : " + str(self.R[j*self.r+ind])
+#            res += self.L[i*self.r+ind]*self.R[j*self.r+ind]
+#        return res
+
+    def treatOneRoundN(self):
+        
+        
+        n = self.read()
+        self.nL = numpy.array(self.L).reshape(self.nRows,self.r)
+        self.nR = numpy.array(self.R).reshape(self.nCols,self.r)
+        modi = set()
+        modj = set()
+        #print "index : " +str(self.index) + " couples a traiter : "+ str(n)
+        for u in range(n):
+            # print u
+            i = self.read()
+            j = self.read()
+            modi.add(i)
+            modj.add(j)
+            if self.method == "NUCLEAR_NORM":
+                    fp = self.fprime((i,j),self.multiplyN(i,j,False))
+                    self.nL[i] = (1-self.mu*self.alpha/self.om_i[i])*self.nL[i]-\
+                        self.alpha*fp*self.nR[j]
+                    self.nR[j] = (1-self.mu*self.alpha/self.om_j[j])*self.nR[j]-\
+                      self.alpha*fp*self.nL[i]
+        for ind in modi:
+            self.L[ind*self.r:(ind+1)*self.r] = self.nL[ind]
+        for ind in modj:
+            self.R[ind*self.r:(ind+1)*self.r] = self.nR[ind]
+#                    for ind in range(self.r):
+#                        newL = (1-self.mu*self.alpha/self.om_i[i])*self.L[i*self.r+ind]-\
+#                        self.alpha*fp*self.R[j*self.r+ind]
+#                        newR = (1-self.mu*self.alpha/self.om_j[j])*self.R[j*self.r+ind]-\
+#                        self.alpha*fp*self.L[i*self.r+ind]
+#                        if(newL>10**20 or newR>10**20):
+#                            print self.multiply(i,j,True)
+#                            assert(True==False)
+#                        if(str(newL)=="nan" or str(newR) == "nan" or str(newL)=="inf" or str(newR) == "inf" or str(newL)=="-inf" or str(newR) == "-inf"):
+#                            print self.index
+#                            print self.multiply(i,j,True)
+#                            assert(True==False)
+#                        self.L[i*self.r+ind] = newL
+#                        self.R[j*self.r+ind] = newR
             #print "Thread %d : (%d, %d)" % (self.index, i, j)
             
         #printMatrix(self.globalMatrix, self.nRows, self.nCols)
     
-    def multiply(self,i,j,printing):
-        res = 0.0
-        for ind in range(self.r):
-            if printing:
-                print "ind : "+str(ind) + " L : " + str(self.L[i*self.r+ind])
-                print "ind : "+str(ind) + " R : " + str(self.R[j*self.r+ind])
-            res += self.L[i*self.r+ind]*self.R[j*self.r+ind]
-        return res
+    def multiplyN(self,i,j,printing):
+        return numpy.dot(self.nL[i],self.nR[j])
+#        res = 0.0
+#        for ind in range(self.r):
+#            if printing:
+#                print "ind : "+str(ind) + " L : " + str(self.L[i*self.r+ind])
+#                print "ind : "+str(ind) + " R : " + str(self.R[j*self.r+ind])
+#            res += self.L[i*self.r+ind]*self.R[j*self.r+ind]
+#        return res
         
     def fprime(self,ind,val):
-        return 2*(val-self.mij[ind]-self.avg)
+        return 2*(val-self.mij[ind])
             
     def read(self):
         n = self.buffer[self.bufferRead]
