@@ -1,4 +1,4 @@
-from multiprocessing import Process
+from multiprocessing import Process,Event
 from random import randint
 
 #from topThread import globalMatrix
@@ -8,53 +8,62 @@ from random import randint
 class PermThread (Process):
 
     def __init__(self,
-                 event, counter, lock,
-                 index, workingThreads,
+                 eventFEnew,eventFEold,
+                 counterFE, lockFE,
+                 nWThreads,
                  buffers, bufferSize,
-                 nRows, nCols, maxIter):
+                 nRows, nCols, nbEpochs,om
+                 ):
+        
         Process.__init__(self)
-        self.event = event
-        #self.workingThreads = workingThreads
-        self.nRows = nRows
-        self.nCols = nCols
-        self.nThread = len(workingThreads)
+        
+        # Concurrency tools
+        self.counterFE = counterFE
+        self.eventFEnew = eventFEnew
+        self.eventFEold = eventFEold
+        self.lockFE = lockFE
 
-        self.counter = counter
-        self.lock = lock
-
-        self.index = index
-        self.maxIter = maxIter
-        self.nIter = 0
-        self.round = 0
+        # I/O with working threads
         self.buffers = buffers
         self.bufferSize = bufferSize
-        self.bufferWrite = [0 for _ in range(self.nThread)]
+        self.bufferWrite = [0 for _ in range(nWThreads)]
+        
+        # Problem-specific data        
+        self.nRows = nRows
+        self.nCols = nCols
+        self.nWThread = nWThreads
+        self.om = om
+        self.nbEpochs = nbEpochs
+
 
     def run(self):
         print "Starting permThread"
-        while self.hasNext():
-            print "permThread on iter : %d" % self.nIter
+        
+        for i in range(1,self.nbEpochs):
+            print "permThread on epoch : %d" % i 
             self.createOneShuffle()
-
-            if self.checkArray():
+            if self.checkArray(self.lockFE,self.counterFE,self.eventFEold,self.nWThread+1):
                 print "Perm finished last"
-                self.event.set()
-                self.event.clear()
+                self.eventFEnew.set()
             else:
                 print "Perm waiting..."
-                self.event.wait()
-            self.nIter += 1
+                self.eventFEnew.wait()
+            self.eventFEnew,self.eventFEold=self.eventFEold,self.eventFEnew
         print "Exiting permThread"
+        self.eventFEnew.set()
 
-    def checkArray(self):
-        self.lock.acquire()
-        self.counter.value += 1
-        if self.counter.value > self.nThread:
-            self.counter.value = 0
-            self.lock.release()
+    def checkArray(self,lock,counter,event,value):
+        lock.acquire()
+        counter.value += 1
+        if counter.value == value:
+            event.clear()
+            counter.value = 0
+            lock.release()
             return True
         else:
-            self.lock.release()
+            lock.release()
+            return False
+            
         # self.boolArray[self.index] = True
         # for b in self.boolArray:
         #     if not b:
@@ -66,26 +75,21 @@ class PermThread (Process):
         # return True
 
     def createOneShuffle(self):
-        print "shuffling, round %d" % self.round
-        if self.round == 0:
-            self.permRow = createPerm(self.nRows)
-            self.permCol = createPerm(self.nRows)
+        # print "shuffling, round %d" % self.round
 
-        for nn in range(self.nThread):
-            roundQueue = []
-            n = (nn + self.round) % self.nThread
-            for i in range(n * self.nRows / self.nThread,
-                          (n + 1) * self.nRows / self.nThread):
-                for j in range(nn * self.nCols / self.nThread,
-                              (nn + 1) * self.nCols / self.nThread):
-                    roundQueue.append((self.permRow[i], self.permCol[j]))
-                    #print "perm : %d | %d | (%d, %d)" % (self.round, nn, i, j)
-            self.pushToQueue(nn, roundQueue)
+        permRow = createPerm(self.nRows)
+        permCol = createPerm(self.nCols)
+        C = [[[] for _ in range(self.nWThread)] for _ in range(self.nWThread)]
+        
+        for (i,j) in self.om:
+            a = self.nWThread*permRow[i]/self.nRows
+            b = self.nWThread*permCol[i]/self.nCols
+            C[a][b].append((i,j))
 
-        self.round = (self.round + 1) % self.nThread
-
-    def hasNext(self):
-        return self.nIter <= self.maxIter
+        for u in range(self.nWThread):
+            for a in range(self.nWThread):
+                b = (a + u) % self.nWThread
+                self.pushToQueue(a, C[a][b])
 
     def write(self, buff, n):
         self.buffers[buff][self.bufferWrite[buff]] = n
