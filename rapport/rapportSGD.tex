@@ -90,7 +90,7 @@
 %% ==> Write your text here or include other files.
 
 %% The simple version:
-\title{Descente de gradient parallélisée}
+\title{Descente de gradient parallélisée pour système de recommendation collaborative}
 \author{Matthieu Vegreville & Guillaume Wenzek}
 %\date{} %%If commented, the current date is used.
 \maketitle
@@ -121,43 +121,53 @@
 \chapter{Introduction du problème}
 
 \section{Descente de gradient stochastique}
-La régression linéaire et logistique, les réseaux de neurones, utilisent ce que l'on appelle la descente de gradient. 
+La régression linéaire et logistique, les réseaux de neurones, utilisent ce que l'on appelle la descente de gradient. Cette méthode d'optimisation consiste à chercher un minimum en se déplaçant à chaque étape d'un petit pas dans la direction opposée au gradient. 
 Cette méthode à notamment  l'avantage d'avoir une convergence assurée dans le cas de l'optimisation d'une fonction convexe. Mais elle devient très lente dès que l'on a un jeu de donnée de taille significative. 
 La descente de gradient stochastique permet d'accélérer la convergence, mais ne permet plus de garantir la convergence exact. En pratique la descente de gradient stochastique est largement utilisée.
-Formalisons un peu le problème. On cherche à minimiser une erreur de prédiction assortie d'une régularisation :
+Formalisons un peu le problème. Étant donné un ensemble de données de "training", $(x_i)_i$, et de valeurs cible, $y_i$, on cherche le vecteur $\Theta$ qui minimise l'erreur de prédiction. Cette erreur est assortie d'une régularisation :
 \begin{equation}
 	S(\theta) =	\sum_i{(\theta . x_i - y_i)^ 2} / M + \left\| \theta \right\| 
 \end{equation}
 La valeur du gradient de cette fonction est :
 \begin{equation}
-	G_S(\theta) =	2 * \sum_i{\theta . x_i } / M + 2 * \theta
+	\vect{\grad}(S)(\theta) =	2 * \sum_i{\theta . x_i } / M + 2 * \theta
 \end{equation}
-La fonction $S$ étant convexe, nous sommes assurés de converger. Pour calculer le vecteur, nous avons besoin de l'ensemble des $x_i$. La descente stochastique fait le pari qu'en utilisant seulement une petite partie des $x_i$ on peut avoir une relativement bonne approximation du gradient, et que les erreurs de chaque itérations se compensant on convergera vers le minimum global.
-Cette descente de gradient dite stochastique car on choisit à chaque étape des $x_i$ aléatoirement pour calculer une approximation du gradient a l'avantage d'être plus rapide à calculer. 
+La fonction $S$ étant convexe, nous sommes assurés de converger par descente de gradient. Pour calculer le gradient, nous avons besoin de l'ensemble des $x_i$. La descente stochastique fait le pari qu'en utilisant seulement une petite partie des $x_i$ on peut avoir une relativement bonne approximation du gradient, et que les erreurs de chaque itérations se compensant on convergera vers le minimum global.
+Cette descente de gradient est dite stochastique car on choisit à chaque étape des $x_i$ aléatoirement pour calculer une approximation du gradient.
+Ainsi le gradient est plus rapide à calculer, ce qui accelère chaque itération. En revanche il en faudra certainement plus avant de converger, mais en pratique la descente de gradient stochastique s'avère bien plus rapide.
 La descente de gradient (classique ou stochastique) peut facilement se paralléliser. En effet le gradient étant obtenu à partir d'une somme, on peut répartir les exemples de training entre différents cœurs, chaque cœurs s'occupant de calculer le gradient sur ses exemples (ou une partie). Il faut ensuite rassembler les sommes partielles afin d'obtenir le gradient puis updater le vecteur $\theta$.
 
 \section{Système de recommandation collaborative}
 Un problème classique en machine learning est celui de recommandation collaborative. Ce problème est par exemple celui de Netflix : ayant un ensemble d'utilisateurs, qui ont regardé et noté des film comment faire des prédictions à tout les utilisateurs même à ceux ayant notés peu de films ?
-L'approche classique est la suivante, on essaye de résoudre simultanément deux problèmes : pour un film à quels utilisateurs va-t-il plaire et pour un utilisateur, quels film vont l'intéresser ?
-Cette fois on n'a plus un vecteur $\theta$ pour l'ensemble des utilisateurs mais un vecteur $\theta_j$ pour chaque utilisateur $j$. Chaque film $i$ reçoit une note $y_{ij}$ de la part de $j$. Bien que la matrice $Y$ soit très grosse (pour Netflix plus de 10 millions d'utilisateurs et plus de 100 mille films), elle est essentiellement vide. En effet la plupart des utilisateurs ne notent que très peu de films. Notons : $\Omega$ l'ensemble des couples $(i, j)$ correspondant aux films $i$ notés par l'utilisateur $j$. Pour ce ramener à un problème classique on note $\Theta_j$ le vecteur de recommandation de l'utilisateur $j$, et $X_i$ le vecteur de "features" du film $i$.
+L'approche classique est la suivante, on essaye de résoudre simultanément deux problèmes : pour un film, à quels utilisateurs va-t-il plaire et pour un utilisateur, quels film vont l'intéresser ?
+En entrée nous avons une matrice de note. Chaque film $i$ reçoit une note $y_{ij}$ de la part de $j$.
+Bien que la matrice $Y$ soit très grosse (pour Netflix plus de 10 millions d'utilisateurs et plus de 100 mille films), elle est essentiellement vide.
+En effet la plupart des utilisateurs ne notent que très peu de films. 
+Notons : $\Omega$ l'ensemble des couples $(i, j)$ correspondant aux films $i$ notés par l'utilisateur $j$. 
+Pour ce ramener à un problème classique on note $\Theta_j$ le vecteur de recommandation de l'utilisateur $j$, et $X_i$ le vecteur de "features" du film $i$.
 Il s'agit donc maintenant de minimiser la fonction :
 \begin{equation}
 	S(\Theta, X) =	\frac{1}{\left| \Omega \right|} \sum_{i, j \in \Omega}{(\Theta_{j} . X_{i} - y_{ij})^ 2} + \sum_j \left\| \Theta_j \right\| + \sum_i \left\| X_i \right\| 
 \end{equation}
 Cette fonction de coup étant toujours convexe, on peut envisager d'utiliser une descente de gradient. La question est de savoir quelle taille affecter au vecteur de features des films. Celui-ci est critique car le nombre d'opérations dépend linéairement de ce rang.
-La première remarque est que la matrice $Y$ des notes données a un rang très faible. En effet si deux utilisateurs aime tout les deux les films d'actions il est probable que tout les films d'action qu'ils ont vu aura probablement des notes proches.
+La première remarque est que la matrice $Y$ des notes données a un rang très faible. En effet si deux utilisateurs aime tout les deux les films d'actions il est probable que tout les films d'action qu'ils ont vu auront probablement des notes proches.
 Si l'on suppose que les nombres de catégories de film et d'utilisateurs sont relativement limités, on voit que les matrice $X$ et $\Theta$ n'ont pas besoin d'avoir beaucoup de lignes.
 L'évaluation de ce nombre de ligne $r$ sera abordé plus loin.
 
-\section{Approches pour la recommandation collaboratives}
+\section{Autre approches pour la recommandation collaboratives}
 L'expression de la fonction de coup peut se réécrire de la façon plus abstraite suivante :
 \begin{equation}
 	S(W) =	f{W} + \left\| W \right\|
 \end{equation}
 Outre la descente de gradient, différentes méthodes mathématiques existe pour minimiser cette fonction.
 Celles-ci font un usage extensif du calcul des valeurs singulières de la matrice $W$, ce qui rend le processus long et inapplicable pour des problèmes avec des dimensions comme celles des bases de données de Netflix.
+D'autres méthodes utilisent une norme particulière en lieu et place de la norme euclidienne classique. Le choix de la norme est en effet critique car de lui dépend le gradient, et le profil de la surface.
+Plusieurs papiers propose d'utiliser des normes sur les valeurs principales. Par exemple la norme dîtes nucléaires :
+\begin{equation}
+    \left\| W \right\|_* = \inf \{ \left\| L \right\|_2^2 
+    + \left\| R \right\|_2^2   |   LR = W \}
+\end{equation}
 
-...
 
 \chapter{Méthode proposée}
 Le papier "Parallel Stochastic Gradient Algorithms for Large-Scale Matrix Completion" de Benjamin Recht \& Christopher Ré propose une méthode, Jellyfish, pour implémenter une descente de gradient stochastique parallèle de façon efficace.
